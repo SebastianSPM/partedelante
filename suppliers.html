@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Proveedores</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="page-header">
+        <h1>Gestión de Proveedores</h1>
+        <p class="page-subtitle">Administra tu red de proveedores y socios comerciales</p>
+    </div>
+    
+    <div class="main-container">
+        <!-- Sección de Búsqueda -->
+        <div class="search-section">
+            <div class="section-header">
+                <h2>Buscar Proveedores</h2>
+                <div class="section-icon">🔍</div>
+            </div>
+            <form id="searchForm" class="search-form" action="/abc_tech_platform/backend/modules/suppliers.php" method="GET">
+                <div class="search-input-group">
+                    <input type="text" name="search" placeholder="Buscar por nombre de empresa..." autocomplete="off">
+                    <button type="submit" class="btn-search">
+                        <span>Buscar</span>
+                        <i class="search-icon">🔎</i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Separador Visual -->
+        <div class="section-divider">
+            <div class="divider-line"></div>
+            <div class="divider-text">O</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <!-- Sección de Creación -->
+        <div class="create-section">
+            <div class="section-header">
+                <h2>Agregar Nuevo Proveedor</h2>
+                <div class="section-icon">🏢</div>
+            </div>
+            <form id="createForm" class="create-form" action="/abc_tech_platform/backend/modules/suppliers.php" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="company_name">Nombre de la Empresa</label>
+                        <input type="text" id="company_name" name="company_name" placeholder="Razón social o nombre comercial" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contact">Persona de Contacto</label>
+                        <input type="text" id="contact" name="contact" placeholder="Nombre del representante">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phone">Teléfono</label>
+                        <input type="text" id="phone" name="phone" placeholder="+57 300 123 4567">
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="products_provided">Productos que Provee</label>
+                        <textarea id="products_provided" name="products_provided" placeholder="Describe los productos o servicios que ofrece este proveedor..." rows="4"></textarea>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="reset" class="btn btn-secondary">
+                        <span>Limpiar</span>
+                        <i>🗑️</i>
+                    </button>
+                    <button type="submit" name="create" class="btn btn-primary" onclick="return validateForm('createForm');">
+                        <span>Agregar Proveedor</span>
+                        <i>🏢</i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Sección de Resultados -->
+        <div class="results-section">
+            <div class="section-header">
+                <h2>Lista de Proveedores</h2>
+                <div class="section-icon">📋</div>
+            </div>
+            <div id="suppliersList" class="suppliers-list">
+                <!-- Los resultados se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div id="error" class="error-message" style="display: none;"></div>
+    </div>
+
+    <!-- Botón flotante para volver al dashboard -->
+    <a href="dashboard.html" class="floating-back-btn" title="Volver al Dashboard">
+        <span>🏠</span>
+    </a>
+
+    <script src="js/scripts.js"></script>
+    <script>
+        // Variables globales
+        let searchTimeout = null;
+
+        // Función para cargar proveedores
+        function loadSuppliers(searchTerm = '') {
+            const suppliersList = document.getElementById('suppliersList');
+            const errorDiv = document.getElementById('error');
+            
+            // Mostrar indicador de carga
+            suppliersList.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Cargando proveedores...</p></div>';
+            
+            const url = `/abc_tech_platform/backend/modules/suppliers.php?search=${encodeURIComponent(searchTerm)}`;
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    suppliersList.innerHTML = data;
+                    
+                    // Si no hay resultados, mostrar mensaje amigable
+                    if (!data.trim() || data.includes('No se encontraron')) {
+                        suppliersList.innerHTML = `
+                            <div class="no-results">
+                                <div class="no-results-icon">🏢</div>
+                                <h3>No se encontraron proveedores</h3>
+                                <p>${searchTerm ? 'Intenta con otros términos de búsqueda' : 'Comienza agregando tu primer proveedor'}</p>
+                            </div>
+                        `;
+                    }
+                    
+                    errorDiv.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    suppliersList.innerHTML = `
+                        <div class="error-state">
+                            <div class="error-icon">⚠️</div>
+                            <h3>Error al cargar los datos</h3>
+                            <p>Hubo un problema al conectar con el servidor. Por favor, intenta de nuevo.</p>
+                            <button onclick="loadSuppliers('${searchTerm}')" class="btn btn-primary">Reintentar</button>
+                        </div>
+                    `;
+                });
+        }
+
+        // Búsqueda en tiempo real con debounce
+        function setupRealTimeSearch() {
+            const searchInput = document.querySelector('input[name="search"]');
+            
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.trim();
+                    
+                    // Limpiar timeout anterior
+                    if (searchTimeout) {
+                        clearTimeout(searchTimeout);
+                    }
+                    
+                    // Búsqueda con delay para evitar muchas peticiones
+                    searchTimeout = setTimeout(() => {
+                        loadSuppliers(searchTerm);
+                    }, 500);
+                });
+            }
+        }
+
+        // Manejar envío del formulario de búsqueda
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const searchTerm = this.querySelector('input[name="search"]').value.trim();
+            loadSuppliers(searchTerm);
+        });
+
+        // Manejar envío del formulario de creación
+        document.getElementById('createForm').addEventListener('submit', function(e) {
+            if (!validateForm('createForm')) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Mostrar indicador de carga en el botón
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span>Agregando...</span><div class="btn-spinner"></div>';
+            submitBtn.disabled = true;
+            
+            // Reestablecer el botón después de un tiempo (en caso de error)
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }, 10000);
+        });
+
+        // Limpiar formulario
+        document.querySelector('button[type="reset"]').addEventListener('click', function() {
+            const form = document.getElementById('createForm');
+            const inputs = form.querySelectorAll('input, textarea');
+            
+            inputs.forEach(input => {
+                input.classList.remove('error');
+                const errorMsg = input.parentElement.querySelector('.field-error');
+                if (errorMsg) errorMsg.remove();
+            });
+        });
+
+        // Inicializar cuando la página se carga
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSuppliers(); // Cargar todos los proveedores inicialmente
+            setupRealTimeSearch(); // Configurar búsqueda en tiempo real
+        });
+    </script>
+</body>
+</html>

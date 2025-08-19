@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Servicios</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="page-header">
+        <h1>Gestión de Servicios</h1>
+        <p class="page-subtitle">Administra los servicios técnicos y su asignación</p>
+    </div>
+    
+    <div class="main-container">
+        <!-- Sección de Creación -->
+        <div class="create-section">
+            <div class="section-header">
+                <h2>Crear Nuevo Servicio</h2>
+                <div class="section-icon">🔧</div>
+            </div>
+            <form id="createForm" class="create-form" action="/abc_tech_platform/backend/modules/services.php" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="name">Nombre del Servicio</label>
+                        <input type="text" id="name" name="name" placeholder="Ej: Reparación de computadora" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="technician">Técnico Asignado</label>
+                        <input type="text" id="technician" name="technician" placeholder="Nombre del técnico responsable">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cost">Costo del Servicio ($)</label>
+                        <input type="number" id="cost" name="cost" placeholder="0.00" step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="estimated_time">Tiempo Estimado</label>
+                        <input type="text" id="estimated_time" name="estimated_time" placeholder="Ej: 2 horas, 1 día, etc.">
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="reset" class="btn btn-secondary">
+                        <span>Limpiar</span>
+                        <i>🗑️</i>
+                    </button>
+                    <button type="submit" name="create" class="btn btn-primary" onclick="return validateForm('createForm');">
+                        <span>Crear Servicio</span>
+                        <i>🔧</i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Separador Visual -->
+        <div class="section-divider">
+            <div class="divider-line"></div>
+            <div class="divider-text">Servicios Disponibles</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <!-- Sección de Servicios -->
+        <div class="results-section">
+            <div class="section-header">
+                <h2>Lista de Servicios</h2>
+                <div class="section-icon">📋</div>
+                <div class="services-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Servicios:</span>
+                        <span class="stat-value" id="totalServices">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Costo Promedio:</span>
+                        <span class="stat-value" id="avgCost">$0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filtros de servicios -->
+            <div class="services-filters">
+                <div class="filter-group">
+                    <label for="costFilter">Filtrar por Costo:</label>
+                    <select id="costFilter">
+                        <option value="all">Todos los precios</option>
+                        <option value="low">Económicos (< $50)</option>
+                        <option value="medium">Medio ($50 - $150)</option>
+                        <option value="high">Premium (> $150)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="sortBy">Ordenar por:</label>
+                    <select id="sortBy">
+                        <option value="name">Nombre</option>
+                        <option value="technician">Técnico</option>
+                        <option value="cost">Costo</option>
+                        <option value="time">Tiempo</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="servicesList" class="services-list">
+                <!-- Los servicios se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div id="error" class="error-message" style="display: none;"></div>
+    </div>
+
+    <!-- Botón flotante para volver al dashboard -->
+    <a href="dashboard.html" class="floating-back-btn" title="Volver al Dashboard">
+        <span>🏠</span>
+    </a>
+
+    <script src="js/scripts.js"></script>
+    <script>
+        // Función para cargar servicios
+        function loadServices() {
+            const servicesList = document.getElementById('servicesList');
+            const errorDiv = document.getElementById('error');
+            
+            // Mostrar indicador de carga
+            servicesList.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Cargando servicios...</p></div>';
+            
+            fetch('/abc_tech_platform/backend/modules/services.php')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    servicesList.innerHTML = data;
+                    
+                    // Si no hay resultados, mostrar mensaje amigable
+                    if (!data.trim() || data.includes('No se encontraron')) {
+                        servicesList.innerHTML = `
+                            <div class="no-results">
+                                <div class="no-results-icon">🔧</div>
+                                <h3>No hay servicios registrados</h3>
+                                <p>Comienza creando tu primer servicio técnico</p>
+                            </div>
+                        `;
+                    } else {
+                        // Actualizar estadísticas si hay datos
+                        updateServicesStats();
+                    }
+                    
+                    errorDiv.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    servicesList.innerHTML = `
+                        <div class="error-state">
+                            <div class="error-icon">⚠️</div>
+                            <h3>Error al cargar los servicios</h3>
+                            <p>Hubo un problema al conectar con el servidor. Por favor, intenta de nuevo.</p>
+                            <button onclick="loadServices()" class="btn btn-primary">Reintentar</button>
+                        </div>
+                    `;
+                });
+        }
+
+        // Actualizar estadísticas de servicios
+        function updateServicesStats() {
+            const table = document.querySelector('#servicesList table');
+            if (!table) return;
+
+            const rows = table.querySelectorAll('tbody tr, tr:not(:first-child)');
+            let totalServices = rows.length;
+            let totalCost = 0;
+
+            rows.forEach(row => {
+                const costCell = row.cells[2]; // Asumiendo que costo está en la 3ra columna
+                if (costCell) {
+                    const cost = parseFloat(costCell.textContent.replace(/[^\d.-]/g, '')) || 0;
+                    totalCost += cost;
+                    
+                    // Agregar clases según el costo
+                    if (cost < 50) {
+                        row.classList.add('low-cost-service');
+                    } else if (cost > 150) {
+                        row.classList.add('high-cost-service');
+                    }
+                }
+            });
+
+            const avgCost = totalServices > 0 ? (totalCost / totalServices).toFixed(2) : 0;
+
+            // Actualizar los valores en la interfaz
+            document.getElementById('totalServices').textContent = totalServices;
+            document.getElementById('avgCost').textContent = `$${avgCost}`;
+        }
+
+        // Configurar filtros
+        function setupFilters() {
+            const costFilter = document.getElementById('costFilter');
+            const sortBy = document.getElementById('sortBy');
+
+            if (costFilter) {
+                costFilter.addEventListener('change', applyFilters);
+            }
+            
+            if (sortBy) {
+                sortBy.addEventListener('change', applyFilters);
+            }
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            const table = document.querySelector('#servicesList table');
+            if (!table) return;
+
+            const costFilter = document.getElementById('costFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const rows = Array.from(table.querySelectorAll('tbody tr, tr:not(:first-child)'));
+
+            // Filtrar filas
+            rows.forEach(row => {
+                const costCell = row.cells[2];
+                const cost = parseFloat(costCell?.textContent.replace(/[^\d.-]/g, '')) || 0;
+                let showRow = true;
+
+                switch (costFilter) {
+                    case 'low':
+                        showRow = cost < 50;
+                        break;
+                    case 'medium':
+                        showRow = cost >= 50 && cost <= 150;
+                        break;
+                    case 'high':
+                        showRow = cost > 150;
+                        break;
+                }
+
+                row.style.display = showRow ? '' : 'none';
+            });
+
+            // Ordenar filas visibles
+            const visibleRows = rows.filter(row => row.style.display !== 'none');
+            sortRows(visibleRows, sortBy);
+        }
+
+        // Ordenar filas
+        function sortRows(rows, sortBy) {
+            const tbody = document.querySelector('#servicesList tbody') || document.querySelector('#servicesList table');
+            if (!tbody) return;
+
+            rows.sort((a, b) => {
+                let aValue, bValue;
+
+                switch (sortBy) {
+                    case 'technician':
+                        aValue = a.cells[1]?.textContent.trim().toLowerCase() || '';
+                        bValue = b.cells[1]?.textContent.trim().toLowerCase() || '';
+                        return aValue.localeCompare(bValue);
+                    case 'cost':
+                        aValue = parseFloat(a.cells[2]?.textContent.replace(/[^\d.-]/g, '')) || 0;
+                        bValue = parseFloat(b.cells[2]?.textContent.replace(/[^\d.-]/g, '')) || 0;
+                        return bValue - aValue; // Descendente para costo
+                    case 'time':
+                        aValue = a.cells[3]?.textContent.trim().toLowerCase() || '';
+                        bValue = b.cells[3]?.textContent.trim().toLowerCase() || '';
+                        return aValue.localeCompare(bValue);
+                    default: // name
+                        aValue = a.cells[0]?.textContent.trim().toLowerCase() || '';
+                        bValue = b.cells[0]?.textContent.trim().toLowerCase() || '';
+                        return aValue.localeCompare(bValue);
+                }
+            });
+
+            // Reorganizar en el DOM
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Manejar envío del formulario de creación
+        document.getElementById('createForm').addEventListener('submit', function(e) {
+            if (!validateForm('createForm')) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Mostrar indicador de carga en el botón
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span>Creando...</span><div class="btn-spinner"></div>';
+            submitBtn.disabled = true;
+            
+            // Reestablecer el botón después de un tiempo (en caso de error)
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }, 10000);
+        });
+
+        // Limpiar formulario
+        document.querySelector('button[type="reset"]').addEventListener('click', function() {
+            const form = document.getElementById('createForm');
+            const inputs = form.querySelectorAll('input, textarea');
+            
+            inputs.forEach(input => {
+                input.classList.remove('error');
+                const errorMsg = input.parentElement.querySelector('.field-error');
+                if (errorMsg) errorMsg.remove();
+            });
+        });
+
+        // Inicializar cuando la página se carga
+        document.addEventListener('DOMContentLoaded', function() {
+            loadServices(); // Cargar todos los servicios inicialmente
+            setupFilters(); // Configurar filtros
+        });
+    </script>
+</body>
+</html>

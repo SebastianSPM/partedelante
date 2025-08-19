@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inventario de Productos</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="page-header">
+        <h1>Inventario de Productos</h1>
+        <p class="page-subtitle">Gestiona tu inventario y controla el stock de productos</p>
+    </div>
+    
+    <div class="main-container">
+        <!-- Sección de Creación -->
+        <div class="create-section">
+            <div class="section-header">
+                <h2>Agregar Nuevo Producto</h2>
+                <div class="section-icon">📦</div>
+            </div>
+            <form id="createForm" class="create-form" action="/abc_tech_platform/backend/modules/products.php" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="code">Código del Producto</label>
+                        <input type="text" id="code" name="code" placeholder="SKU o código único" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="price">Precio ($)</label>
+                        <input type="number" id="price" name="price" placeholder="0.00" step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stock">Cantidad en Stock</label>
+                        <input type="number" id="stock" name="stock" placeholder="0" min="0" required>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="description">Descripción del Producto</label>
+                        <textarea id="description" name="description" placeholder="Describe las características del producto..." rows="4" required></textarea>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="reset" class="btn btn-secondary">
+                        <span>Limpiar</span>
+                        <i>🗑️</i>
+                    </button>
+                    <button type="submit" name="create" class="btn btn-primary" onclick="return validateForm('createForm');">
+                        <span>Agregar Producto</span>
+                        <i>📦</i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Separador Visual -->
+        <div class="section-divider">
+            <div class="divider-line"></div>
+            <div class="divider-text">Inventario Actual</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <!-- Sección de Inventario -->
+        <div class="results-section">
+            <div class="section-header">
+                <h2>Lista de Productos</h2>
+                <div class="section-icon">📋</div>
+                <div class="inventory-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Productos:</span>
+                        <span class="stat-value" id="totalProducts">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Stock Bajo:</span>
+                        <span class="stat-value low-stock" id="lowStock">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filtros de inventario -->
+            <div class="inventory-filters">
+                <div class="filter-group">
+                    <label for="stockFilter">Filtrar por Stock:</label>
+                    <select id="stockFilter">
+                        <option value="all">Todos los productos</option>
+                        <option value="inStock">En stock (>0)</option>
+                        <option value="lowStock">Stock bajo (≤10)</option>
+                        <option value="outOfStock">Sin stock (0)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="sortBy">Ordenar por:</label>
+                    <select id="sortBy">
+                        <option value="name">Nombre</option>
+                        <option value="code">Código</option>
+                        <option value="price">Precio</option>
+                        <option value="stock">Stock</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="productsList" class="products-list">
+                <!-- Los productos se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div id="error" class="error-message" style="display: none;"></div>
+    </div>
+
+    <!-- Botón flotante para volver al dashboard -->
+    <a href="dashboard.html" class="floating-back-btn" title="Volver al Dashboard">
+        <span>🏠</span>
+    </a>
+
+    <script src="js/scripts.js"></script>
+    <script>
+        // Variables globales
+        let allProducts = [];
+        let filteredProducts = [];
+
+        // Función para cargar productos
+        function loadProducts() {
+            const productsList = document.getElementById('productsList');
+            const errorDiv = document.getElementById('error');
+            
+            // Mostrar indicador de carga
+            productsList.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Cargando inventario...</p></div>';
+            
+            fetch('/abc_tech_platform/backend/modules/products.php')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    productsList.innerHTML = data;
+                    
+                    // Si no hay resultados, mostrar mensaje amigable
+                    if (!data.trim() || data.includes('No se encontraron')) {
+                        productsList.innerHTML = `
+                            <div class="no-results">
+                                <div class="no-results-icon">📦</div>
+                                <h3>No hay productos en el inventario</h3>
+                                <p>Comienza agregando tu primer producto al inventario</p>
+                            </div>
+                        `;
+                    } else {
+                        // Actualizar estadísticas si hay datos
+                        updateInventoryStats();
+                    }
+                    
+                    errorDiv.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    productsList.innerHTML = `
+                        <div class="error-state">
+                            <div class="error-icon">⚠️</div>
+                            <h3>Error al cargar el inventario</h3>
+                            <p>Hubo un problema al conectar con el servidor. Por favor, intenta de nuevo.</p>
+                            <button onclick="loadProducts()" class="btn btn-primary">Reintentar</button>
+                        </div>
+                    `;
+                });
+        }
+
+        // Actualizar estadísticas del inventario
+        function updateInventoryStats() {
+            const table = document.querySelector('#productsList table');
+            if (!table) return;
+
+            const rows = table.querySelectorAll('tbody tr, tr:not(:first-child)');
+            let totalProducts = rows.length;
+            let lowStockCount = 0;
+
+            rows.forEach(row => {
+                const stockCell = row.cells[3]; // Asumiendo que stock está en la 4ta columna
+                if (stockCell) {
+                    const stock = parseInt(stockCell.textContent.trim()) || 0;
+                    if (stock <= 10 && stock > 0) {
+                        lowStockCount++;
+                        row.classList.add('low-stock-row');
+                    }
+                    if (stock === 0) {
+                        row.classList.add('out-of-stock-row');
+                    }
+                }
+            });
+
+            // Actualizar los valores en la interfaz
+            document.getElementById('totalProducts').textContent = totalProducts;
+            document.getElementById('lowStock').textContent = lowStockCount;
+        }
+
+        // Configurar filtros
+        function setupFilters() {
+            const stockFilter = document.getElementById('stockFilter');
+            const sortBy = document.getElementById('sortBy');
+
+            if (stockFilter) {
+                stockFilter.addEventListener('change', applyFilters);
+            }
+            
+            if (sortBy) {
+                sortBy.addEventListener('change', applyFilters);
+            }
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            const table = document.querySelector('#productsList table');
+            if (!table) return;
+
+            const stockFilter = document.getElementById('stockFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const rows = Array.from(table.querySelectorAll('tbody tr, tr:not(:first-child)'));
+
+            // Filtrar filas
+            rows.forEach(row => {
+                const stockCell = row.cells[3];
+                const stock = parseInt(stockCell?.textContent.trim()) || 0;
+                let showRow = true;
+
+                switch (stockFilter) {
+                    case 'inStock':
+                        showRow = stock > 0;
+                        break;
+                    case 'lowStock':
+                        showRow = stock <= 10 && stock > 0;
+                        break;
+                    case 'outOfStock':
+                        showRow = stock === 0;
+                        break;
+                }
+
+                row.style.display = showRow ? '' : 'none';
+            });
+
+            // Ordenar filas visibles
+            const visibleRows = rows.filter(row => row.style.display !== 'none');
+            sortRows(visibleRows, sortBy);
+        }
+
+        // Ordenar filas
+        function sortRows(rows, sortBy) {
+            const tbody = document.querySelector('#productsList tbody') || document.querySelector('#productsList table');
+            if (!tbody) return;
+
+            rows.sort((a, b) => {
+                let aValue, bValue;
+
+                switch (sortBy) {
+                    case 'code':
+                        aValue = a.cells[0]?.textContent.trim().toLowerCase() || '';
+                        bValue = b.cells[0]?.textContent.trim().toLowerCase() || '';
+                        return aValue.localeCompare(bValue);
+                    case 'price':
+                        aValue = parseFloat(a.cells[2]?.textContent.replace(/[^\d.-]/g, '')) || 0;
+                        bValue = parseFloat(b.cells[2]?.textContent.replace(/[^\d.-]/g, '')) || 0;
+                        return bValue - aValue; // Descendente para precio
+                    case 'stock':
+                        aValue = parseInt(a.cells[3]?.textContent.trim()) || 0;
+                        bValue = parseInt(b.cells[3]?.textContent.trim()) || 0;
+                        return bValue - aValue; // Descendente para stock
+                    default: // name/description
+                        aValue = a.cells[1]?.textContent.trim().toLowerCase() || '';
+                        bValue = b.cells[1]?.textContent.trim().toLowerCase() || '';
+                        return aValue.localeCompare(bValue);
+                }
+            });
+
+            // Reorganizar en el DOM
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Manejar envío del formulario de creación
+        document.getElementById('createForm').addEventListener('submit', function(e) {
+            if (!validateForm('createForm')) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Mostrar indicador de carga en el botón
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span>Agregando...</span><div class="btn-spinner"></div>';
+            submitBtn.disabled = true;
+            
+            // Reestablecer el botón después de un tiempo (en caso de error)
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }, 10000);
+        });
+
+        // Limpiar formulario
+        document.querySelector('button[type="reset"]').addEventListener('click', function() {
+            const form = document.getElementById('createForm');
+            const inputs = form.querySelectorAll('input, textarea');
+            
+            inputs.forEach(input => {
+                input.classList.remove('error');
+                const errorMsg = input.parentElement.querySelector('.field-error');
+                if (errorMsg) errorMsg.remove();
+            });
+        });
+
+        // Inicializar cuando la página se carga
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProducts(); // Cargar todos los productos inicialmente
+            setupFilters(); // Configurar filtros
+        });
+    </script>
+</body>
+</html>

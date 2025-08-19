@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Gestión de Clientes</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <h1>Gestión de Clientes</h1>
+    <div id="error" class="error"></div>
+    <form id="searchForm" action="/abc_tech_platform/backend/modules/clients.php" method="GET">
+        <input type="text" name="search" placeholder="Buscar por nombre o email">
+        <button type="submit">Buscar</button>
+    </form>
+    <form id="createForm" action="/abc_tech_platform/backend/modules/clients.php" method="POST">
+        <h2>Crear Cliente</h2>
+        <input type="text" name="name" placeholder="Nombre" required>
+        <input type="email" name="email" placeholder="Correo" required>
+        <input type="text" name="phone" placeholder="Teléfono">
+        <textarea name="address" placeholder="Dirección"></textarea>
+        <textarea name="purchase_history" placeholder="Historial de compras"></textarea>
+        <button type="submit" name="create">Crear</button>
+    </form>
+    <div id="clientsList"></div>
+    <script src="js/scripts.js"></script>
+    <script>
+        function loadClients() {
+            fetch('/abc_tech_platform/backend/modules/clients.php?search=' + encodeURIComponent(document.querySelector('input[name="search"]')?.value || ''))
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('clientsList').innerHTML = data;
+                    console.log('Datos recibidos:', data); // Depuración
+                })
+                .catch(error => console.error('Error al cargar clientes:', error));
+        }
+
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            loadClients();
+        });
+
+        document.getElementById('createForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(document.getElementById('createForm'));
+            fetch('/abc_tech_platform/backend/modules/clients.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log('Respuesta del servidor:', data); // Depuración
+                document.getElementById('error').innerHTML = data; // Mostrar toda la respuesta
+                loadClients(); // Recargar la lista
+            })
+            .catch(error => console.error('Error al crear cliente:', error));
+        });
+
+        loadClients(); // Cargar al iniciar
+    </script>
+</body>
+</html>
