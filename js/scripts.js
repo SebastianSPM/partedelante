@@ -1211,3 +1211,17 @@ th:hover {
 const styleSheet = document.createElement('style');
 styleSheet.textContent = additionalStyles;
 document.head.appendChild(styleSheet);
+
+
+// --- Código de tu ABCTechUI ya existente ---
+// (todo tu código actual está aquí)
+
+// ----------------------------
+// Ejemplos de uso de la API
+import { getClients, loginUser } from "./api.js";
+
+// Obtener clientes y mostrarlos en consola
+getClients().then(data => console.log(data));
+
+// Hacer login de prueba
+loginUser("usuario", "1234").then(data => console.log(data));
